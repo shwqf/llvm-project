@@ -82,7 +82,7 @@ struct SmallHeap {
 
   void update(T *Node, WeightTy OldWeight) {
     assert(Node);
-    auto Weight = WeightTraits::getWeight(Node);
+    auto Weight = WeightTraits::getWeight(*Node);
     if (Less()(Weight, OldWeight))
       adjustUp(Node);
     else if (Less()(OldWeight, Weight))
@@ -192,9 +192,13 @@ struct DefaultWeightTraits {
   }
 
   struct Less {
+    bool operator()(WeightTy Lhs, WeightTy Rhs) {
+      return Lhs < Rhs;
+    }
+
     bool operator()(const InterferenceGraphNode *Lhs,
                     const InterferenceGraphNode *Rhs) {
-      return getWeight(*Lhs) < getWeight(*Rhs);
+      return (*this)(getWeight(*Lhs), getWeight(*Rhs));
     }
   };
 };
