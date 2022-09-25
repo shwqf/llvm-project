@@ -1010,9 +1010,9 @@ define void @test_limit_one_pred(ptr noalias %s1, ptr nocapture %s2, i32 %x, ptr
 ; CHECK-NEXT:    .cfi_offset %r12, -32
 ; CHECK-NEXT:    .cfi_offset %r14, -24
 ; CHECK-NEXT:    .cfi_offset %r15, -16
-; CHECK-NEXT:    movq %r8, %r12
-; CHECK-NEXT:    movq %rcx, %r15
-; CHECK-NEXT:    movq %rsi, %r14
+; CHECK-NEXT:    movq %r8, %r15
+; CHECK-NEXT:    movq %rcx, %r14
+; CHECK-NEXT:    movq %rsi, %r12
 ; CHECK-NEXT:    movq %rdi, %rbx
 ; CHECK-NEXT:    movl %r9d, 12(%rdi)
 ; CHECK-NEXT:    cmpl $18, %edx
@@ -1022,14 +1022,10 @@ define void @test_limit_one_pred(ptr noalias %s1, ptr nocapture %s2, i32 %x, ptr
 ; CHECK-NEXT:    movq %rbx, %rdi
 ; CHECK-NEXT:    callq bar@PLT
 ; CHECK-NEXT:  .LBB10_2: # %if.end
-; CHECK-NEXT:    movups (%r12), %xmm0
-; CHECK-NEXT:    movups %xmm0, (%r15)
-; CHECK-NEXT:    movq (%rbx), %rax
-; CHECK-NEXT:    movq %rax, (%r14)
-; CHECK-NEXT:    movl 8(%rbx), %eax
-; CHECK-NEXT:    movl %eax, 8(%r14)
-; CHECK-NEXT:    movl 12(%rbx), %eax
-; CHECK-NEXT:    movl %eax, 12(%r14)
+; CHECK-NEXT:    movups (%r15), %xmm0
+; CHECK-NEXT:    movups %xmm0, (%r14)
+; CHECK-NEXT:    movups (%rbx), %xmm0
+; CHECK-NEXT:    movups %xmm0, (%r12)
 ; CHECK-NEXT:    addq $8, %rsp
 ; CHECK-NEXT:    .cfi_def_cfa_offset 40
 ; CHECK-NEXT:    popq %rbx
@@ -1102,9 +1098,9 @@ define void @test_limit_one_pred(ptr noalias %s1, ptr nocapture %s2, i32 %x, ptr
 ; CHECK-AVX2-NEXT:    .cfi_offset %r12, -32
 ; CHECK-AVX2-NEXT:    .cfi_offset %r14, -24
 ; CHECK-AVX2-NEXT:    .cfi_offset %r15, -16
-; CHECK-AVX2-NEXT:    movq %r8, %r12
-; CHECK-AVX2-NEXT:    movq %rcx, %r15
-; CHECK-AVX2-NEXT:    movq %rsi, %r14
+; CHECK-AVX2-NEXT:    movq %r8, %r15
+; CHECK-AVX2-NEXT:    movq %rcx, %r14
+; CHECK-AVX2-NEXT:    movq %rsi, %r12
 ; CHECK-AVX2-NEXT:    movq %rdi, %rbx
 ; CHECK-AVX2-NEXT:    movl %r9d, 12(%rdi)
 ; CHECK-AVX2-NEXT:    cmpl $18, %edx
@@ -1114,14 +1110,10 @@ define void @test_limit_one_pred(ptr noalias %s1, ptr nocapture %s2, i32 %x, ptr
 ; CHECK-AVX2-NEXT:    movq %rbx, %rdi
 ; CHECK-AVX2-NEXT:    callq bar@PLT
 ; CHECK-AVX2-NEXT:  .LBB10_2: # %if.end
-; CHECK-AVX2-NEXT:    vmovups (%r12), %xmm0
-; CHECK-AVX2-NEXT:    vmovups %xmm0, (%r15)
-; CHECK-AVX2-NEXT:    movq (%rbx), %rax
-; CHECK-AVX2-NEXT:    movq %rax, (%r14)
-; CHECK-AVX2-NEXT:    movl 8(%rbx), %eax
-; CHECK-AVX2-NEXT:    movl %eax, 8(%r14)
-; CHECK-AVX2-NEXT:    movl 12(%rbx), %eax
-; CHECK-AVX2-NEXT:    movl %eax, 12(%r14)
+; CHECK-AVX2-NEXT:    vmovups (%r15), %xmm0
+; CHECK-AVX2-NEXT:    vmovups %xmm0, (%r14)
+; CHECK-AVX2-NEXT:    vmovups (%rbx), %xmm0
+; CHECK-AVX2-NEXT:    vmovups %xmm0, (%r12)
 ; CHECK-AVX2-NEXT:    addq $8, %rsp
 ; CHECK-AVX2-NEXT:    .cfi_def_cfa_offset 40
 ; CHECK-AVX2-NEXT:    popq %rbx
@@ -1150,9 +1142,9 @@ define void @test_limit_one_pred(ptr noalias %s1, ptr nocapture %s2, i32 %x, ptr
 ; CHECK-AVX512-NEXT:    .cfi_offset %r12, -32
 ; CHECK-AVX512-NEXT:    .cfi_offset %r14, -24
 ; CHECK-AVX512-NEXT:    .cfi_offset %r15, -16
-; CHECK-AVX512-NEXT:    movq %r8, %r12
-; CHECK-AVX512-NEXT:    movq %rcx, %r15
-; CHECK-AVX512-NEXT:    movq %rsi, %r14
+; CHECK-AVX512-NEXT:    movq %r8, %r15
+; CHECK-AVX512-NEXT:    movq %rcx, %r14
+; CHECK-AVX512-NEXT:    movq %rsi, %r12
 ; CHECK-AVX512-NEXT:    movq %rdi, %rbx
 ; CHECK-AVX512-NEXT:    movl %r9d, 12(%rdi)
 ; CHECK-AVX512-NEXT:    cmpl $18, %edx
@@ -1162,14 +1154,10 @@ define void @test_limit_one_pred(ptr noalias %s1, ptr nocapture %s2, i32 %x, ptr
 ; CHECK-AVX512-NEXT:    movq %rbx, %rdi
 ; CHECK-AVX512-NEXT:    callq bar@PLT
 ; CHECK-AVX512-NEXT:  .LBB10_2: # %if.end
-; CHECK-AVX512-NEXT:    vmovups (%r12), %xmm0
-; CHECK-AVX512-NEXT:    vmovups %xmm0, (%r15)
-; CHECK-AVX512-NEXT:    movq (%rbx), %rax
-; CHECK-AVX512-NEXT:    movq %rax, (%r14)
-; CHECK-AVX512-NEXT:    movl 8(%rbx), %eax
-; CHECK-AVX512-NEXT:    movl %eax, 8(%r14)
-; CHECK-AVX512-NEXT:    movl 12(%rbx), %eax
-; CHECK-AVX512-NEXT:    movl %eax, 12(%r14)
+; CHECK-AVX512-NEXT:    vmovups (%r15), %xmm0
+; CHECK-AVX512-NEXT:    vmovups %xmm0, (%r14)
+; CHECK-AVX512-NEXT:    vmovups (%rbx), %xmm0
+; CHECK-AVX512-NEXT:    vmovups %xmm0, (%r12)
 ; CHECK-AVX512-NEXT:    addq $8, %rsp
 ; CHECK-AVX512-NEXT:    .cfi_def_cfa_offset 40
 ; CHECK-AVX512-NEXT:    popq %rbx
