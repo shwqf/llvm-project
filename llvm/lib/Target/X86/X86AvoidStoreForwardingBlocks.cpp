@@ -38,6 +38,8 @@
 #include "X86Subtarget.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
+#include "llvm/CodeGen/MachineBlockFrequencyInfo.h"
+#include "llvm/CodeGen/MachineBranchProbabilityInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstr.h"
@@ -49,6 +51,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/MC/MCInstrDesc.h"
+#include "llvm/Support/BranchProbability.h"
 
 using namespace llvm;
 
@@ -64,6 +67,10 @@ static cl::opt<unsigned> X86AvoidSFBInspectionLimit(
              "inspect for store forwarding blocks."),
     cl::init(20), cl::Hidden);
 
+namespace llvm {
+extern cl::opt<unsigned> StaticLikelyProb;
+} // namespace llvm
+
 namespace {
 
 using DisplacementSizeMap = std::map<int64_t, unsigned>;
@@ -71,7 +78,7 @@ using DisplacementSizeMap = std::map<int64_t, unsigned>;
 class X86AvoidSFBPass : public MachineFunctionPass {
 public:
   static char ID;
-  X86AvoidSFBPass() : MachineFunctionPass(ID) { }
+  X86AvoidSFBPass() : MachineFunctionPass(ID) {}
 
   StringRef getPassName() const override {
     return "X86 Avoid Store Forwarding Blocks";
@@ -82,10 +89,16 @@ public:
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     MachineFunctionPass::getAnalysisUsage(AU);
     AU.addRequired<AAResultsWrapperPass>();
+    AU.addRequired<MachineBlockFrequencyInfo>();
+    AU.addPreserved<MachineBlockFrequencyInfo>();
+    AU.addRequired<MachineBranchProbabilityInfo>();
+    AU.addPreserved<MachineBranchProbabilityInfo>();
   }
 
 private:
   MachineRegisterInfo *MRI = nullptr;
+  MachineBlockFrequencyInfo *MBFI = nullptr;
+  MachineBranchProbabilityInfo *MBPI = nullptr;
   const X86InstrInfo *TII = nullptr;
   const X86RegisterInfo *TRI = nullptr;
   SmallVector<std::pair<MachineInstr *, MachineInstr *>, 2>
@@ -120,11 +133,12 @@ private:
 
 char X86AvoidSFBPass::ID = 0;
 
-INITIALIZE_PASS_BEGIN(X86AvoidSFBPass, DEBUG_TYPE, "Machine code sinking",
-                      false, false)
+INITIALIZE_PASS_BEGIN(X86AvoidSFBPass, DEBUG_TYPE,
+                      "X86 void store forward block", false, false)
 INITIALIZE_PASS_DEPENDENCY(AAResultsWrapperPass)
-INITIALIZE_PASS_END(X86AvoidSFBPass, DEBUG_TYPE, "Machine code sinking", false,
-                    false)
+INITIALIZE_PASS_DEPENDENCY(MachineBranchProbabilityInfo)
+INITIALIZE_PASS_END(X86AvoidSFBPass, DEBUG_TYPE,
+                    "X86 avoid store forward block", false, false)
 
 FunctionPass *llvm::createX86AvoidStoreForwardingBlocks() {
   return new X86AvoidSFBPass();
@@ -315,7 +329,8 @@ static bool isRelevantAddressingMode(MachineInstr *MI) {
   const MachineOperand &Disp = getDispOperand(MI);
   const MachineOperand &Scale = MI->getOperand(AddrOffset + X86::AddrScaleAmt);
   const MachineOperand &Index = MI->getOperand(AddrOffset + X86::AddrIndexReg);
-  const MachineOperand &Segment = MI->getOperand(AddrOffset + X86::AddrSegmentReg);
+  const MachineOperand &Segment =
+      MI->getOperand(AddrOffset + X86::AddrSegmentReg);
 
   if (!((Base.isReg() && Base.getReg() != X86::NoRegister) || Base.isFI()))
     return false;
@@ -361,6 +376,9 @@ findPotentialBlockers(MachineInstr *LoadInst) {
     MachineBasicBlock *MBB = LoadInst->getParent();
     int LimitLeft = InspectionLimit - BlockCount;
     for (MachineBasicBlock *PMBB : MBB->predecessors()) {
+      // Accessed address in a self-loop may change every iteration.
+      if (PMBB == MBB)
+        continue;
       int PredCount = 0;
       for (MachineInstr &PBInst : llvm::reverse(*PMBB)) {
         if (PBInst.isMetaInstruction())
@@ -544,8 +562,8 @@ void X86AvoidSFBPass::findPotentiallylBlockedCopies(MachineFunction &MF) {
         if (StoreMI.getParent() == MI.getParent() &&
             isPotentialBlockedMemCpyPair(MI.getOpcode(), StoreMI.getOpcode()) &&
             isRelevantAddressingMode(&MI) &&
-            isRelevantAddressingMode(&StoreMI) &&
-            MI.hasOneMemOperand() && StoreMI.hasOneMemOperand()) {
+            isRelevantAddressingMode(&StoreMI) && MI.hasOneMemOperand() &&
+            StoreMI.hasOneMemOperand()) {
           if (!alias(**MI.memoperands_begin(), **StoreMI.memoperands_begin()))
             BlockedLoadsStoresPairs.push_back(std::make_pair(&MI, &StoreMI));
         }
@@ -555,7 +573,7 @@ void X86AvoidSFBPass::findPotentiallylBlockedCopies(MachineFunction &MF) {
 
 unsigned X86AvoidSFBPass::getRegSizeInBytes(MachineInstr *LoadInst) {
   const auto *TRC = TII->getRegClass(TII->get(LoadInst->getOpcode()), 0, TRI,
-                              *LoadInst->getParent()->getParent());
+                                     *LoadInst->getParent()->getParent());
   return TRI->getRegSizeInBits(*TRC) / 8;
 }
 
@@ -671,6 +689,8 @@ bool X86AvoidSFBPass::runOnMachineFunction(MachineFunction &MF) {
   TII = MF.getSubtarget<X86Subtarget>().getInstrInfo();
   TRI = MF.getSubtarget<X86Subtarget>().getRegisterInfo();
   AA = &getAnalysis<AAResultsWrapperPass>().getAAResults();
+  MBFI = &getAnalysis<MachineBlockFrequencyInfo>();
+  MBPI = &getAnalysis<MachineBranchProbabilityInfo>();
   LLVM_DEBUG(dbgs() << "Start X86AvoidStoreForwardBlocks\n";);
   // Look for a load then a store to XMM/YMM which look like a memcpy
   findPotentiallylBlockedCopies(MF);
@@ -680,6 +700,10 @@ bool X86AvoidSFBPass::runOnMachineFunction(MachineFunction &MF) {
     int64_t LdDispImm = getDispOperand(LoadInst).getImm();
     DisplacementSizeMap BlockingStoresDispSizeMap;
 
+    BlockFrequency WeightedFreq;
+    auto *LoadMBB = LoadInst->getParent();
+    const MachineBasicBlock *LastPredMBB = nullptr;
+    SmallVector<std::pair<int64_t, unsigned>, 2> PredStoreInfo;
     SmallVector<MachineInstr *, 2> PotentialBlockers =
         findPotentialBlockers(LoadInst);
     for (auto *PBInst : PotentialBlockers) {
@@ -690,14 +714,39 @@ bool X86AvoidSFBPass::runOnMachineFunction(MachineFunction &MF) {
       int64_t PBstDispImm = getDispOperand(PBInst).getImm();
       unsigned PBstSize = (*PBInst->memoperands_begin())->getSize();
       // This check doesn't cover all cases, but it will suffice for now.
-      // TODO: take branch probability into consideration, if the blocking
-      // store is in an unreached block, breaking the memcopy could lose
-      // performance.
       if (hasSameBaseOpValue(LoadInst, PBInst) &&
           isBlockingStore(LdDispImm, getRegSizeInBytes(LoadInst), PBstDispImm,
-                          PBstSize))
-        updateBlockingStoresDispSizeMap(BlockingStoresDispSizeMap, PBstDispImm,
-                                        PBstSize);
+                          PBstSize)) {
+        auto *StoreMBB = PBInst->getParent();
+        if (StoreMBB != LoadMBB) {
+          PredStoreInfo.push_back({PBstDispImm, PBstSize});
+          if (LastPredMBB != StoreMBB) {
+            WeightedFreq += MBFI->getBlockFreq(StoreMBB) *
+                            MBPI->getEdgeProbability(StoreMBB, LoadMBB);
+            LastPredMBB = StoreMBB;
+          }
+        } else {
+          updateBlockingStoresDispSizeMap(BlockingStoresDispSizeMap,
+                                          PBstDispImm, PBstSize);
+        }
+      }
+    }
+
+    // Take branch probability into consideration, if the blocking
+    // store is in an unreached block, breaking the memcopy could lose
+    // performance.
+    if (WeightedFreq.getFrequency() != 0) {
+      BlockFrequency TotalWeightedFreq;
+      for (auto *PMBB : LoadMBB->predecessors())
+        TotalWeightedFreq +=
+            MBFI->getBlockFreq(PMBB) * MBPI->getEdgeProbability(PMBB, LoadMBB);
+      auto HotProb =
+          BranchProbability::getBranchProbability(StaticLikelyProb, 100);
+      if (WeightedFreq >= TotalWeightedFreq * HotProb) {
+        for (auto [PBstDispImm, PBstSize] : PredStoreInfo)
+          updateBlockingStoresDispSizeMap(BlockingStoresDispSizeMap,
+                                          PBstDispImm, PBstSize);
+      }
     }
 
     if (BlockingStoresDispSizeMap.empty())
