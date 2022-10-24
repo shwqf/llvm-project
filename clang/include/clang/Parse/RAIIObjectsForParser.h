@@ -431,6 +431,20 @@ namespace clang {
     SourceLocation getCloseLocation() const { return LClose; }
     SourceRange getRange() const { return SourceRange(LOpen, LClose); }
 
+    bool isEllipsis() const { return P.Tok.is(tok::ellipsis); }
+
+    bool comsumeEllipsis() {
+      if (!P.Tok.is(tok::ellipsis))
+        return true;
+
+      if (getDepth() < P.getLangOpts().BracketDepth) {
+        LOpen = P.ComsumeEllipsis();
+        return false;
+      }
+
+      return diagnoseOverflow();
+    }
+
     bool consumeOpen() {
       if (!P.Tok.is(Kind))
         return true;

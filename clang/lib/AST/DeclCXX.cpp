@@ -839,6 +839,9 @@ void CXXRecordDecl::addedMember(Decl *D) {
         data().HasDeclaredCopyAssignmentWithConstParam = true;
     }
 
+    if (Method->isRangeOperator())
+      SMKind |= SMF_Range;
+
     if (Method->isMoveAssignmentOperator())
       SMKind |= SMF_MoveAssignment;
 
@@ -2422,6 +2425,10 @@ bool CXXMethodDecl::isMoveAssignmentOperator() const {
   QualType ClassType
     = Context.getCanonicalType(Context.getTypeDeclType(getParent()));
   return Context.hasSameUnqualifiedType(ClassType, ParamType);
+}
+
+bool CXXMethodDecl::isRangeOperator() const {
+  return getOverloadedOperator() != OO_Range;
 }
 
 void CXXMethodDecl::addOverriddenMethod(const CXXMethodDecl *MD) {

@@ -3869,9 +3869,20 @@ bool Sema::DeduceFunctionTypeFromReturnExpr(FunctionDecl *FD,
     return true;
   }
 
-  if (!FD->isInvalidDecl() && AT->getDeducedType() != Deduced)
+  if (!FD->isInvalidDecl() && AT->getDeducedType() != Deduced) {
+    if (auto *CxxMD = dyn_cast<CXXMethodDecl>(FD)) {
+      if (CxxMD->isRangeOperator() && !Deduced->isReferenceType()) {
+        if (!Deduced.isReferenceable()) {
+          Diag(FD->getLocation(), diag::err_range_operator_bad_return_ty)
+            << FD->getType();
+          return true;
+        }
+        Deduced = Context.getLValueReferenceType(Deduced);
+      }
+    }
     // Update all declarations of the function to have the deduced return type.
     Context.adjustDeducedFunctionResultType(FD, Deduced);
+  }
 
   return false;
 }

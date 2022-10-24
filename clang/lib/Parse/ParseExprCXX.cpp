@@ -2532,7 +2532,7 @@ bool Parser::ParseUnqualifiedIdTemplateId(
 ///            !     =    <  >    += -=   *=  /=  %=
 ///            ^=    &=   |= <<   >> >>= <<=  ==  !=
 ///            <=    >=   && ||   ++ --   ,   ->* ->
-///            ()    []   <=>
+///            ()    []   <=> [...]
 ///
 ///       conversion-function-id: [C++ 12.3.2]
 ///         operator conversion-type-id
@@ -2618,14 +2618,21 @@ bool Parser::ParseUnqualifiedIdOperator(CXXScopeSpec &SS, bool EnteringContext,
     case tok::l_square: {
       // Consume the '[' and ']'.
       BalancedDelimiterTracker T(*this, tok::l_square);
+      bool isRange{false};
       T.consumeOpen();
+      if (T.isEllipsis()) {
+        if (T.comsumeEllipsis())
+          return true;
+        isRange = true;
+      }
+
       T.consumeClose();
       if (T.getCloseLocation().isInvalid())
         return true;
 
       SymbolLocations[SymbolIdx++] = T.getOpenLocation();
       SymbolLocations[SymbolIdx++] = T.getCloseLocation();
-      Op = OO_Subscript;
+      Op = isRange ? OO_Range : OO_Subscript;
       break;
     }
 

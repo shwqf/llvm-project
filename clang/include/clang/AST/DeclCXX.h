@@ -273,6 +273,7 @@ class CXXRecordDecl : public RecordDecl {
     SMF_CopyAssignment = 0x8,
     SMF_MoveAssignment = 0x10,
     SMF_Destructor = 0x20,
+    SMF_Range = 0x40,
     SMF_All = 0x3f
   };
 
@@ -883,6 +884,10 @@ public:
   /// constructor for this class.
   bool needsOverloadResolutionForMoveConstructor() const {
     return data().NeedOverloadResolutionForMoveConstructor;
+  }
+
+  bool hasUserDeclaredRange() const {
+    return data().UserDeclaredSpecialMembers & SMF_Range;
   }
 
   /// Determine whether this class has a user-declared copy assignment
@@ -2064,6 +2069,8 @@ public:
 
   /// Determine whether this is a move assignment operator.
   bool isMoveAssignmentOperator() const;
+
+  bool isRangeOperator() const;
 
   CXXMethodDecl *getCanonicalDecl() override {
     return cast<CXXMethodDecl>(FunctionDecl::getCanonicalDecl());

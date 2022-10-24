@@ -640,6 +640,12 @@ private:
     return PrevTokLocation;
   }
 
+  SourceLocation ComsumeEllipsis() {
+    PrevTokLocation = Tok.getLocation();
+    PP.Lex(Tok);
+    return PrevTokLocation;
+  }
+
   /// ConsumeStringToken - Consume the current 'peek token', lexing a new one
   /// and returning the token kind.  This method is specific to strings, as it
   /// handles string literal concatenation, as per C99 5.1.1.2, translation

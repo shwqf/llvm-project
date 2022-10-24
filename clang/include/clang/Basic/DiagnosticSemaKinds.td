@@ -9075,6 +9075,9 @@ def err_operator_overload_needs_class_or_enum : Error<
   "overloaded %0 must have at least one parameter of class "
   "or enumeration type">;
 
+def err_range_operator_bad_return_ty : Error<
+  "operator[...] type %0 must have refereenceable return type">;
+
 def err_operator_overload_variadic : Error<"overloaded %0 cannot be variadic">;
 def err_operator_overload_static : Error<
   "overloaded %0 cannot be a static member function">;

@@ -1324,6 +1324,7 @@ UnaryOperator::getOverloadedOpcode(OverloadedOperatorKind OO, bool Postfix) {
   case OO_Tilde:      return UO_Not;
   case OO_Exclaim:    return UO_LNot;
   case OO_Coawait:    return UO_Coawait;
+  case OO_Range:      return UO_Range;
   }
 }
 
@@ -1338,6 +1339,7 @@ OverloadedOperatorKind UnaryOperator::getOverloadedOperator(Opcode Opc) {
   case UO_Not: return OO_Tilde;
   case UO_LNot: return OO_Exclaim;
   case UO_Coawait: return OO_Coawait;
+  case UO_Range: return OO_Range;
   default: return OO_None;
   }
 }

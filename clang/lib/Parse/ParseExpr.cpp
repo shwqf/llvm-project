@@ -1930,6 +1930,7 @@ Parser::ParsePostfixExpressionSuffix(ExprResult LHS) {
       bool HasError = false;
       PreferredType.enterSubscript(Actions, Tok.getLocation(), LHS.get());
 
+      bool isRangeOperator{false};
       // We try to parse a list of indexes in all language mode first
       // and, in we find 0 or one index, we try to parse an OpenMP array
       // section. This allow us to support C++2b multi dimensional subscript and
@@ -1940,6 +1941,10 @@ Parser::ParsePostfixExpressionSuffix(ExprResult LHS) {
           if (getLangOpts().CPlusPlus11 && Tok.is(tok::l_brace)) {
             Diag(Tok, diag::warn_cxx98_compat_generalized_initializer_lists);
             Idx = ParseBraceInitializer();
+          } else if (Tok.is(tok::ellipsis)) {
+            T.comsumeEllipsis();
+            isRangeOperator = true;
+            break;
           } else {
             Idx = ParseExpression(); // May be a comma expression
           }
@@ -2005,6 +2010,28 @@ Parser::ParsePostfixExpressionSuffix(ExprResult LHS) {
 
       // Match the ']'.
       T.consumeClose();
+      if (isRangeOperator) {
+        /// TODO(@wqf): add more
+        auto *Obj = LHS.get();
+        assert(Obj);
+        if (auto *DRE = dyn_cast<DeclRefExpr>(Obj)) {
+          auto Ty = DRE->getType();
+          CXXRecordDecl *ClassOrStruct{nullptr};
+          if (auto *ETy = dyn_cast<ElaboratedType>(Ty))
+            Ty = ETy->desugar();
+          if (auto *RTy = dyn_cast<RecordType>(Ty))
+            ClassOrStruct = RTy->getAsCXXRecordDecl();
+
+          if (!ClassOrStruct || !ClassOrStruct->hasUserDeclaredRange())
+            return ExprError();
+
+          UnresolvedSet<16> Functions;
+          OverloadedOperatorKind OverOp = UnaryOperator::getOverloadedOperator(UO_Range);
+          if (getCurScope() && OverOp != OO_None)
+            Actions.LookupOverloadedOperatorName(OverOp, getCurScope(), Functions);
+          return Actions.CreateOverloadedUnaryOp(Tok.getLocation(), UO_Range, Functions, LHS.get());
+        }
+      }
       break;
     }
 

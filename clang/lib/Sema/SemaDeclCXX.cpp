@@ -15996,7 +15996,7 @@ bool Sema::CheckOverloadedOperatorDeclaration(FunctionDecl *FnDecl) {
   //   described in the rest of this subclause.
   unsigned NumParams = FnDecl->getNumParams()
                      + (isa<CXXMethodDecl>(FnDecl)? 1 : 0);
-  if (Op != OO_Call && Op != OO_Subscript &&
+  if (Op != OO_Call && Op != OO_Subscript && Op != OO_Range &&
       ((NumParams == 1 && !CanBeUnaryOperator) ||
        (NumParams == 2 && !CanBeBinaryOperator) || (NumParams < 1) ||
        (NumParams > 2))) {
